@@ -24,6 +24,7 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static net.openhft.chronicle.values.Values.newNativeReference;
 import static org.junit.Assert.assertEquals;
@@ -44,6 +45,33 @@ interface DemoOrderVOInterface {
 }
 
 public class DemoChronicleMapTest {
+
+    @Test
+    public void testLargeStore() throws Exception {
+        File file = File.createTempFile("TestBigStore" + System.currentTimeMillis(), ".test");
+
+        final int entries = 250_000_000;
+
+        try (ChronicleMap<String, String> map = ChronicleMapBuilder
+                .of(String.class, String.class)
+                .entries(entries)
+                .averageKeySize(40)
+                .averageValueSize(120).createPersistedTo(file)) {
+            for (int i = 0; i < entries/ 200; i++) {
+                map.put(String.valueOf(i), String.valueOf(i));
+            }
+        }
+
+        Thread.sleep(5000);
+
+        try (ChronicleMap<String, String> map = ChronicleMapBuilder
+                .of(String.class, String.class)
+                .entries(entries)
+                .averageKeySize(40)
+                .averageValueSize(120).createPersistedTo(file)) {
+            assertEquals(map.longSize(), entries / 200);
+        }
+    }
 
     @Test
     public void testMap() throws IOException {
