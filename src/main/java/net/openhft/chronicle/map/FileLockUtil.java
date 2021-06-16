@@ -105,7 +105,7 @@ public final class FileLockUtil {
 
         FILE_LOCKS.compute(canonicalFile, (f, flr) -> {
                     if (flr != null)
-                        throw new ChronicleFileLockException("A file lock instance already exists for the file " + canonicalFile);
+                        return flr;
 
                     try {
                         if (USE_LOCKING) {

@@ -13,8 +13,7 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 public class FileLockUtilTest {
 
@@ -117,6 +116,27 @@ public class FileLockUtilTest {
             } catch (ChronicleFileLockException e) {
                 FileLockUtil.releaseFileLock(canonicalFile);
             }
+        }
+    }
+
+    @Test
+    public void testTryRunExclusively() {
+        if (!OS.isWindows()) {
+            FileLockUtil.acquireSharedFileLock(canonicalFile, fileChannel);
+
+            boolean locked = FileLockUtil.tryRunExclusively(canonicalFile, fileChannel, () -> {
+            });
+
+            assertFalse(locked);
+
+            FileLockUtil.releaseFileLock(canonicalFile);
+
+            locked = FileLockUtil.tryRunExclusively(canonicalFile, fileChannel, () -> {
+            });
+
+            assertTrue(locked);
+
+            FileLockUtil.releaseFileLock(canonicalFile);
         }
     }
 }
