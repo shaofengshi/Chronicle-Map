@@ -99,27 +99,26 @@ public final class FileLockUtil {
     public static boolean tryRunExclusively(@NotNull final File canonicalFile,
                                       @NotNull final FileChannel fileChannel,
                                       @NotNull final FileIOAction fileIOAction) {
+        AtomicBoolean locked = new AtomicBoolean(false);
+
         FILE_LOCKS.compute(canonicalFile, (f, flr) -> {
                     if (flr != null)
                         throw new ChronicleFileLockException("A file lock instance already exists for the file " + canonicalFile);
 
                     try {
                         if (USE_LOCKING) {
-                            do {
-                                try (FileLock ignored = fileChannel.tryLock()) {
-                                    if (ignored == null) {
-                                        Jvm.pause(10);
+                            try (FileLock ignored = fileChannel.tryLock()) {
+                                if (ignored == null)
+                                    return null;
 
-                                        continue;
-                                    }
+                                fileIOAction.fileIOAction();
 
-                                    fileIOAction.fileIOAction();
-
-                                    break;
-                                }
-                            } while (true);
+                                locked.set(true);
+                            }
                         } else {
                             fileIOAction.fileIOAction();
+
+                            locked.set(true);
                         }
 
                         return null;
@@ -128,6 +127,8 @@ public final class FileLockUtil {
                     }
                 }
         );
+
+        return locked.get();
     }
 
     /**

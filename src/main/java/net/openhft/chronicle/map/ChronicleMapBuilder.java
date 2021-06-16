@@ -1703,15 +1703,26 @@ public final class ChronicleMapBuilder<K, V> implements
                 final AtomicBoolean newFile = new AtomicBoolean();
                 final FileChannel fileChannel = raf.getChannel();
 
-                FileLockUtil.runExclusively(canonicalFile, fileChannel, () -> {
+                while (true) {
                     if (raf.length() == 0) {
-                        map.set(newMap());
-                        headerBuffer.set(writeHeader(fileChannel, map.get()));
-                        newFile.set(true);
-                    } else {
-                        newFile.set(false);
+                        final boolean locked = FileLockUtil.tryRunExclusively(canonicalFile, fileChannel, () -> {
+                            if (raf.length() == 0) {
+                                map.set(newMap());
+                                headerBuffer.set(writeHeader(fileChannel, map.get()));
+                                newFile.set(true);
+                            } else {
+                                newFile.set(false);
+                            }
+                        });
+
+                        if (locked)
+                            break;
+                        else
+                            Jvm.pause(10);
                     }
-                });
+                    else
+                        break;
+                }
 
                 if (newFile.get()) {
                     final int headerSize = headerBuffer.get().remaining();
