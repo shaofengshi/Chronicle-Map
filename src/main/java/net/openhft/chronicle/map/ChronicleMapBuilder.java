@@ -39,6 +39,8 @@ import net.openhft.chronicle.hash.serialization.impl.TypedMarshallableReaderWrit
 import net.openhft.chronicle.map.internal.AnalyticsHolder;
 import net.openhft.chronicle.map.replication.MapRemoteOperations;
 import net.openhft.chronicle.set.ChronicleSetBuilder;
+import net.openhft.chronicle.threads.Pauser;
+import net.openhft.chronicle.threads.TimingPauser;
 import net.openhft.chronicle.values.ValueModel;
 import net.openhft.chronicle.values.Values;
 import net.openhft.chronicle.wire.Marshallable;
@@ -58,6 +60,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -1703,25 +1706,31 @@ public final class ChronicleMapBuilder<K, V> implements
                 final AtomicBoolean newFile = new AtomicBoolean();
                 final FileChannel fileChannel = raf.getChannel();
 
-                while (true) {
-                    if (raf.length() == 0) {
-                        final boolean locked = FileLockUtil.tryRunExclusively(canonicalFile, fileChannel, () -> {
-                            if (raf.length() == 0) {
-                                map.set(newMap());
-                                headerBuffer.set(writeHeader(fileChannel, map.get()));
-                                newFile.set(true);
-                            } else {
-                                newFile.set(false);
-                            }
-                        });
+                TimingPauser pauser = Pauser.balanced();
 
-                        if (locked)
-                            break;
-                        else
-                            Jvm.pause(10);
-                    }
-                    else
+                while (raf.length() == 0) {
+                    final boolean locked = FileLockUtil.tryRunExclusively(canonicalFile, fileChannel, () -> {
+                        if (raf.length() == 0) {
+                            map.set(newMap());
+                            headerBuffer.set(writeHeader(fileChannel, map.get()));
+                            newFile.set(true);
+                        } else {
+                            newFile.set(false);
+                        }
+                    });
+
+                    if (locked)
                         break;
+                    else {
+                        try {
+                            pauser.pause(10, TimeUnit.SECONDS);
+                        }
+                        catch (TimeoutException e) {
+                            LOG.warn("Failed to write header: can't acquire exclusive file lock on empty file for 10 seconds", e);
+
+                            Jvm.rethrow(e);
+                        }
+                    }
                 }
 
                 if (newFile.get()) {

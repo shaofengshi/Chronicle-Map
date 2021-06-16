@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -91,10 +92,11 @@ public final class FileLockUtil {
     }
 
     /**
-     * Executes a closure under exclusive file lock.
+     * Tries to execute a closure under exclusive file lock.
      * If USE_LOCKING is false, provides synchronization only within local JVM.
      *
      * @param fileIOAction Closure to run, can throw {@link IOException}s.
+     * @return <code>true</code> if the lock was successfully acquired and IO action was executed, <code>false</code> otherwise.
      */
     public static boolean tryRunExclusively(@NotNull final File canonicalFile,
                                       @NotNull final FileChannel fileChannel,
@@ -114,6 +116,9 @@ public final class FileLockUtil {
                                 fileIOAction.fileIOAction();
 
                                 locked.set(true);
+                            }
+                            catch (OverlappingFileLockException ignored) {
+                                // File lock is being held by this JVM, unsuccessful attempt.
                             }
                         } else {
                             fileIOAction.fileIOAction();
