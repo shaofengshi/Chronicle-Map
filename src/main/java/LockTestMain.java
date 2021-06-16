@@ -42,9 +42,9 @@ public class LockTestMain {
 
         System.out.println("Success");
 
-        System.out.println("Sleeping for 100 seconds");
+        System.out.println("Sleeping for 300 seconds");
 
-        Jvm.pause(100_000);
+        Jvm.pause(300_000);
 
     }
 }
