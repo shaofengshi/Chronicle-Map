@@ -1675,8 +1675,6 @@ public final class ChronicleMapBuilder<K, V> implements
         replicated = replicationIdentifier != -1;
         persisted = true;
 
-        boolean created = false;
-
         // It's important to canonicalize the file, because CanonicalRandomAccessFiles.acquire()
         // relies on java.io.File equality, which doesn't account symlinks itself.
         final File canonicalFile = file.getCanonicalFile();
@@ -1684,8 +1682,7 @@ public final class ChronicleMapBuilder<K, V> implements
             if (recover)
                 throw new FileNotFoundException("file " + canonicalFile + " should exist for recovery");
             //noinspection ResultOfMethodCallIgnored
-            created = canonicalFile.createNewFile();
-
+            canonicalFile.createNewFile();
         }
         final RandomAccessFile raf = CanonicalRandomAccessFiles.acquire(canonicalFile);
         final ChronicleHashResources resources = new PersistedChronicleHashResources(canonicalFile);
@@ -1694,12 +1691,6 @@ public final class ChronicleMapBuilder<K, V> implements
             if (raf.length() > 0) {
                 result = openWithExistingFile(canonicalFile, raf, resources, recover, overrideBuilderConfig, corruptionListener);
             } else {
-                if (created) {
-                    System.out.println("Sleeping before lock acquisition for 10 seconds");
-
-                    Jvm.pause(10000);
-                }
-
                 // Atomic* allows lambda modification
                 final AtomicReference<VanillaChronicleMap<K, V, ?>> map = new AtomicReference<>();
                 final AtomicReference<ByteBuffer> headerBuffer = new AtomicReference<>();
@@ -1726,7 +1717,7 @@ public final class ChronicleMapBuilder<K, V> implements
                             pauser.pause(10, TimeUnit.SECONDS);
                         }
                         catch (TimeoutException e) {
-                            LOG.warn("Failed to write header: can't acquire exclusive file lock on empty file for 10 seconds", e);
+                            LOG.warn("Failed to write header: can't acquire exclusive file lock on empty file [" + canonicalFile + "] for 10 seconds", e);
 
                             Jvm.rethrow(e);
                         }
