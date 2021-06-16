@@ -96,6 +96,46 @@ public final class FileLockUtil {
      *
      * @param fileIOAction Closure to run, can throw {@link IOException}s.
      */
+    public static boolean tryRunExclusively(@NotNull final File canonicalFile,
+                                      @NotNull final FileChannel fileChannel,
+                                      @NotNull final FileIOAction fileIOAction) {
+        FILE_LOCKS.compute(canonicalFile, (f, flr) -> {
+                    if (flr != null)
+                        throw new ChronicleFileLockException("A file lock instance already exists for the file " + canonicalFile);
+
+                    try {
+                        if (USE_LOCKING) {
+                            do {
+                                try (FileLock ignored = fileChannel.tryLock()) {
+                                    if (ignored == null) {
+                                        Jvm.pause(10);
+
+                                        continue;
+                                    }
+
+                                    fileIOAction.fileIOAction();
+
+                                    break;
+                                }
+                            } while (true);
+                        } else {
+                            fileIOAction.fileIOAction();
+                        }
+
+                        return null;
+                    } catch (Exception e) {
+                        throw Jvm.rethrow(e);
+                    }
+                }
+        );
+    }
+
+    /**
+     * Executes a closure under exclusive file lock.
+     * If USE_LOCKING is false, provides synchronization only within local JVM.
+     *
+     * @param fileIOAction Closure to run, can throw {@link IOException}s.
+     */
     public static void runExclusively(@NotNull final File canonicalFile,
                                       @NotNull final FileChannel fileChannel,
                                       @NotNull final FileIOAction fileIOAction) {
