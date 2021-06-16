@@ -1,4 +1,4 @@
-/*
+package net.openhft.chronicle.map;/*
  * Copyright 2016-2020 Chronicle Software
  *
  * https://chronicle.software
@@ -17,8 +17,6 @@
  */
 
 import net.openhft.chronicle.core.Jvm;
-import net.openhft.chronicle.map.ChronicleMap;
-import net.openhft.chronicle.map.ChronicleMapBuilder;
 
 import java.io.File;
 import java.io.IOException;
